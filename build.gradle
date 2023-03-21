@@ -1,0 +1,44 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+group 'com.github.nevgeny'
+version '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
+
+ext.junitJupiterVersion = '5.9.1'
+ext.jqwikVersion = '1.7.2'
+
+compileTestJava {
+    options.compilerArgs += '-parameters'
+}
+dependencies {
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.9.2'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.9.2'
+
+    testImplementation "net.jqwik:jqwik:${jqwikVersion}"
+    compileOnly("org.jetbrains:annotations:23.0.0")
+}
+
+application {
+    mainClass = 'com.github.nevgeny.Main'
+}
+test {
+    useJUnitPlatform {
+        includeEngines 'jqwik'
+
+        // Or include several Junit engines if you use them
+        // includeEngines 'jqwik', 'junit-jupiter', 'junit-vintage'
+
+        // includeTags 'fast', 'medium'
+        // excludeTags 'slow'
+    }
+
+    include '**/*Properties.class'
+    include '**/*Test.class'
+    include '**/*Tests.class'
+}
