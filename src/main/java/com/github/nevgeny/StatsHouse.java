@@ -16,13 +16,17 @@ public class StatsHouse {
         transport = new Transport(env);
     }
 
+    public Metric metric(String name, String... tagsNames) {
+        return new Metric(name, tagsNames);
+    }
+
 
     public class Metric {
         final String name;
         final String[] tagsNames;
         boolean hasEnv;
 
-        public Metric(String name, String... tagsNames) {
+        private Metric(String name, String... tagsNames) {
             this.name = name;
             if (tagsNames.length > 0) {
                 for (int i = 0; i < tagsNames.length; i++) {

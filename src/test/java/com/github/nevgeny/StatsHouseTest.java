@@ -95,7 +95,7 @@ class StatsHouseTest {
         @Override
         public Arbitrary<Transformer<StatsHouse>> transformer() {
             return testCase().map(tc -> Transformer.mutate("count", sh -> {
-                var metric = sh.new Metric(tc.name, tc.tagNames);
+                var metric = sh.metric(tc.name, tc.tagNames);
                 metric.count(tc.count, tc.tagValues);
             }));
         }
@@ -105,7 +105,7 @@ class StatsHouseTest {
         @Override
         public Arbitrary<Transformer<StatsHouse>> transformer() {
             return testCase().map(tc -> Transformer.mutate("count", sh -> {
-                var metric = sh.new Metric(tc.name, tc.tagNames);
+                var metric = sh.metric(tc.name, tc.tagNames);
                 metric.value(tc.value, tc.tagValues);
             }));
         }
@@ -115,7 +115,7 @@ class StatsHouseTest {
         @Override
         public Arbitrary<Transformer<StatsHouse>> transformer() {
             return testCase().map(tc -> Transformer.mutate("count", sh -> {
-                var metric = sh.new Metric(tc.name, tc.tagNames);
+                var metric = sh.metric(tc.name, tc.tagNames);
                 metric.stringTop(tc.stringTop, tc.tagValues);
             }));
         }
@@ -125,7 +125,7 @@ class StatsHouseTest {
         @Override
         public Arbitrary<Transformer<StatsHouse>> transformer() {
             return testCase().map(tc -> Transformer.mutate("count", sh -> {
-                var metric = sh.new Metric(tc.name, tc.tagNames);
+                var metric = sh.metric(tc.name, tc.tagNames);
                 metric.unique(tc.uniques, tc.tagValues);
             }));
         }

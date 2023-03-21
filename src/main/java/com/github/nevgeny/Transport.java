@@ -214,21 +214,32 @@ class Transport {
         return length;
     }
 
-    private void writeString(String s) {
-        int l = lengthOfString(s);
-        if (l >= maxStringLen) {
-            l = maxStringLen - 1;
+    private void appendString(String s, int bytesLimit){
+        var oldPosition = buffer.position();
+        encoder.encode(CharBuffer.wrap(s), buffer, true);
+        var length = buffer.position() - oldPosition;
+        if (length > bytesLimit) {
+            buffer.position(oldPosition+bytesLimit);
         }
-        if (l <= tinyStringLen) {
-            buffer.put((byte) l);
-            l++;
+
+    }
+    private void writeString(String s) {
+        int bytesLength = lengthOfString(s);
+        if (bytesLength >= maxStringLen) {
+            bytesLength = maxStringLen - 1;
+        }
+        if (bytesLength <= tinyStringLen) {
+            buffer.put((byte) bytesLength);
+            bytesLength++;
         } else {
             buffer.put(bigStringMarker);
-            buffer.put((byte) l);
-            buffer.put((byte) (l >> 8));
-            buffer.put((byte) (l >> 16));
+            buffer.put((byte) bytesLength);
+            buffer.put((byte) (bytesLength >> 8));
+            buffer.put((byte) (bytesLength >> 16));
         }
-        int fillZeroN = l % 4;
+        appendString(s, bytesLength);
+
+        int fillZeroN = bytesLength % 4;
         if (fillZeroN > 0) {
             fillZeroN = 4 - fillZeroN;
         }
