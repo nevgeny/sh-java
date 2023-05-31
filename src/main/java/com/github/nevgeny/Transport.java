@@ -1,5 +1,6 @@
 package com.github.nevgeny;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.net.*;
 import java.nio.BufferOverflowException;
@@ -12,7 +13,7 @@ import java.time.Instant;
 
 import static com.github.nevgeny.StatsHouse.nonEmpty;
 
-class Transport {
+class Transport implements Closeable {
 
     private static final int counterFieldsMask = 1 << 0;
     private static final int valueFieldsMask = 1 << 1;
@@ -42,12 +43,12 @@ class Transport {
     private int batchCount;
     private java.time.Instant nextTimeToSend;
 
-    Transport(String shHost, int shPort, String env) throws SocketException, UnknownHostException {
+    Transport(InetAddress host, int port, String env) throws SocketException {
         this.env = env;
 
         socket = new DatagramSocket(0);
-        this.shHost = InetAddress.getByName(shHost);
-        this.shPort = shPort;
+        this.shHost = host;
+        this.shPort = port;
         buffer = ByteBuffer.allocate(maxDatagramSize);
         buffer.order(ByteOrder.LITTLE_ENDIAN);
         clear();
@@ -70,17 +71,17 @@ class Transport {
         nextTimeToSend = Instant.now().plusMillis(sendIntervalMs);
     }
 
-    synchronized void writeCount(StatsHouse.Metric metric, String[] tags, String skey, double count, long ts) {
-        writeHeader(counterFieldsMask | newSemanticFieldsMask, metric, tags, skey, count, ts, 0);
+    synchronized void writeCount(StatsHouse.Metric metric, String[] tags, int tagsLength, String skey, double count, long ts) {
+        writeHeader(counterFieldsMask | newSemanticFieldsMask, metric, tags,  tagsLength, skey, count, ts, 0);
         maybeSend(Instant.now());
     }
 
-    synchronized void writeValue(StatsHouse.Metric metric, String[] tags, String skey, double[] values, long ts) {
+    synchronized void writeValue(StatsHouse.Metric metric, String[] tags, int tagsLength, String skey, double[] values, long ts) {
         int fieldMask = valueFieldsMask | newSemanticFieldsMask;
         var now = Instant.now();
         for (int i = 0; i < values.length; i++) {
             var needWriteCount = values.length - i;
-            var spaceLeft = writeHeader(fieldMask, metric, tags, skey, 0, ts, tlInt32Size + tlFloat64Size);
+            var spaceLeft = writeHeader(fieldMask, metric, tags, tagsLength, skey, 0, ts, tlInt32Size + tlFloat64Size);
             if (spaceLeft < 0) {
                 return;
             }
@@ -96,12 +97,12 @@ class Transport {
         maybeSend(now);
     }
 
-    synchronized void writeUnique(StatsHouse.Metric metric, String[] tags, String skey, long[] values, long ts) {
+    synchronized void writeUnique(StatsHouse.Metric metric, String[] tags, int tagsLength, String skey, long[] values, long ts) {
         var fieldMask = uniqueFieldsMask | newSemanticFieldsMask;
         var now = Instant.now();
         for (int i = 0; i < values.length; i++) {
             var needWriteCount = values.length - i;
-            var spaceLeft = writeHeader(fieldMask, metric, tags, skey, 0, ts, tlInt32Size + tlInt64Size);
+            var spaceLeft = writeHeader(fieldMask, metric, tags, tagsLength, skey, 0, ts, tlInt32Size + tlInt64Size);
             if (spaceLeft < 0) {
                 return;
             }
@@ -117,9 +118,9 @@ class Transport {
         maybeSend(now);
     }
 
-    private int writeHeader(int fieldMask, StatsHouse.Metric metric, String[] tags, String skey, double count, long ts, int reservedSpace) {
+    private int writeHeader(int fieldMask, StatsHouse.Metric metric, String[] tags, int tagsLength, String skey, double count, long ts, int reservedSpace) {
         var position = buffer.position();
-        var isSuccess = writeHeaderData(fieldMask, metric, tags, skey, count, ts);
+        var isSuccess = writeHeaderData(fieldMask, metric, tags, tagsLength, skey, count, ts);
         if (!isSuccess) {
             return -1;
         }
@@ -130,7 +131,7 @@ class Transport {
         }
         if (position != batchHeaderLen) {
             send(position);
-            writeHeaderData(fieldMask, metric, tags, skey, count, ts);
+            writeHeaderData(fieldMask, metric, tags, tagsLength, skey, count, ts);
             spaceLeft = maxPayloadSize - buffer.position() - reservedSpace;
             if (spaceLeft >= 0) {
                 batchCount++;
@@ -141,7 +142,7 @@ class Transport {
         return -1;
     }
 
-    private boolean writeHeaderData(int fieldMask, StatsHouse.Metric metric, String[] tags, String skey, double count, long ts) {
+    private boolean writeHeaderData(int fieldMask, StatsHouse.Metric metric, String[] tags, int tagsLength, String skey, double count, long ts) {
         if (ts != 0) {
             fieldMask |= tsFieldsMask;
         }
@@ -149,7 +150,7 @@ class Transport {
         try {
             writeInt(fieldMask);
             writeString(metric.name);
-            int tagsCount = Math.min(tags.length, metric.tagsNames.length);
+            int tagsCount = Math.min(tagsLength, metric.tagsNames.length);
             int addTags = 0;
             if (nonEmpty(skey)) addTags++;
             if (!metric.hasEnv) addTags++;
@@ -196,14 +197,6 @@ class Transport {
 
     private void writeLong(long v) {
         buffer.putLong(v);
-//        buffer.put((byte) v);
-//        buffer.put((byte) (v >> 8));
-//        buffer.put((byte) (v >> 16));
-//        buffer.put((byte) (v >> 24));
-//        buffer.put((byte) (v >> 32));
-//        buffer.put((byte) (v >> 40));
-//        buffer.put((byte) (v >> 48));
-//        buffer.put((byte) (v >> 56));
     }
 
     private int lengthOfString(String s) {
@@ -260,6 +253,9 @@ class Transport {
     }
 
     private void send(int position) {
+        if (position == batchHeaderLen) {
+            return;
+        }
         buffer.position(0);
         writeInt(metricsBatchTag);
         writeInt(0);
@@ -273,5 +269,11 @@ class Transport {
         } finally {
             clear();
         }
+    }
+
+    @Override
+    public void close() throws IOException {
+        send(buffer.position());
+        socket.close();
     }
 }

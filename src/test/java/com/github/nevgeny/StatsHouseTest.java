@@ -15,7 +15,7 @@ class StatsHouseTest {
 
     @Provide
     Arbitrary<Object[]> tags() {
-        return Arbitraries.entries(metricName(), metricName()).array(Object[].class);
+        return Arbitraries.entries(metricName(), metricName()).array(Object[].class).ofMaxSize(15);
     }
 
     @Provide
@@ -77,13 +77,13 @@ class StatsHouseTest {
 
 
     @Property
-    void checkMyStack(@ForAll("myStackActions") ActionChain<StatsHouse> chain) {
+    void checkStatsHouse(@ForAll("statsHouseActions") ActionChain<StatsHouse> chain) {
         // TODO add check of receiving
         chain.run();
     }
 
     @Provide
-    Arbitrary<ActionChain<StatsHouse>> myStackActions() {
+    Arbitrary<ActionChain<StatsHouse>> statsHouseActions() {
         return ActionChain.startWith(() -> new StatsHouse("test"))
                 .withAction(new CountAction())
                 .withAction(new ValueAction())
@@ -95,8 +95,11 @@ class StatsHouseTest {
         @Override
         public Arbitrary<Transformer<StatsHouse>> transformer() {
             return testCase().map(tc -> Transformer.mutate("count", sh -> {
-                var metric = sh.metric(tc.name, tc.tagNames);
-                metric.count(tc.count, tc.tagValues);
+                var metric = sh.metric(tc.name);
+                for (int i = 0; i < tc.tagValues.length; i++) {
+                    metric = metric.withTag(tc.tagValues[i]);
+                }
+                metric.count(tc.count);
             }));
         }
     }
@@ -105,8 +108,11 @@ class StatsHouseTest {
         @Override
         public Arbitrary<Transformer<StatsHouse>> transformer() {
             return testCase().map(tc -> Transformer.mutate("count", sh -> {
-                var metric = sh.metric(tc.name, tc.tagNames);
-                metric.value(tc.value, tc.tagValues);
+                var metric = sh.metric(tc.name);
+                for (int i = 0; i < tc.tagValues.length; i++) {
+                    metric = metric.withTag(tc.tagValues[i]);
+                }
+                metric.values(tc.value);
             }));
         }
     }
@@ -115,8 +121,11 @@ class StatsHouseTest {
         @Override
         public Arbitrary<Transformer<StatsHouse>> transformer() {
             return testCase().map(tc -> Transformer.mutate("count", sh -> {
-                var metric = sh.metric(tc.name, tc.tagNames);
-                metric.stringTop(tc.stringTop, tc.tagValues);
+                var metric = sh.metric(tc.name);
+                for (int i = 0; i < tc.tagValues.length; i++) {
+                    metric = metric.withTag(tc.tagValues[i]);
+                }
+                metric.stringTop(tc.stringTop);
             }));
         }
     }
@@ -125,8 +134,11 @@ class StatsHouseTest {
         @Override
         public Arbitrary<Transformer<StatsHouse>> transformer() {
             return testCase().map(tc -> Transformer.mutate("count", sh -> {
-                var metric = sh.metric(tc.name, tc.tagNames);
-                metric.unique(tc.uniques, tc.tagValues);
+                var metric = sh.metric(tc.name);
+                for (int i = 0; i < tc.tagValues.length; i++) {
+                    metric = metric.withTag(tc.tagValues[i]);
+                }
+                metric.unique(tc.uniques);
             }));
         }
     }
